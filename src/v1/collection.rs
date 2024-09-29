@@ -178,7 +178,7 @@ impl ChromaCollection {
             include,
         } = get_options;
         let mut json_body = json!({
-            "ids": ids,
+            "ids": if !ids.is_empty() { Some(ids) } else { None },
             "where": where_metadata,
             "limit": limit,
             "offset": offset,
@@ -507,10 +507,29 @@ mod tests {
     fn test_get_from_collection() {
         let client = ChromaClient::new(Default::default());
 
+        let collection_name = format!("{}-{}", TEST_COLLECTION, rand::random::<u32>());
         let collection = client
-            .get_or_create_collection(TEST_COLLECTION, None)
+            .get_or_create_collection(collection_name.as_str(), None)
             .unwrap();
         assert!(collection.count().is_ok());
+
+        let ids = vec!["test1".into(), "test2".into(), "test3".into(), "test4".into()];
+        let collection_entries = CollectionEntries {
+            ids: ids.clone(),
+            metadatas: None,
+            documents: Some(vec![
+                "Document content 1".into(),
+                "Document content 2".into(),
+                "Document content 3".into(),
+                "Document content 4".into(),
+            ]),
+            embeddings: None,
+        };
+        let response = collection.add(collection_entries, Some(Box::new(MockEmbeddingProvider)));
+        assert!(
+            response.is_ok(),
+            "Embeddings are computed by the embedding_function if embeddings are None and documents are provided"
+        );
 
         let get_query = GetOptions {
             ids: vec![],
@@ -522,6 +541,22 @@ mod tests {
         };
         let get_result = collection.get(get_query).unwrap();
         assert_eq!(get_result.ids.len(), collection.count().unwrap());
+
+        let limit = 2;
+        let offset = 1;
+        let get_query = GetOptions {
+            ids: vec![],
+            where_metadata: None,
+            limit: Some(limit),
+            offset: Some(offset),
+            where_document: None,
+            include: None,
+        };
+        let get_result = collection.get(get_query).unwrap();
+        assert_eq!(get_result.ids.len(), limit);
+        assert_eq!(get_result.ids[0], ids[offset]);
+
+        client.delete_collection(collection_name.as_str()).unwrap()
     }
 
     #[test]

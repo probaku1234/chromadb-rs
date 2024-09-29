@@ -33,3 +33,6 @@ optional = true
 [features]
 bert = ["dep:rust-bert"]
 openai = []
+
+[dev-dependencies]
+rand = "0.8.5"
