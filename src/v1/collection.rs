@@ -356,7 +356,7 @@ impl ChromaCollection {
 #[derive(Deserialize, Debug)]
 pub struct GetResult {
     pub ids: Vec<String>,
-    pub metadatas: Option<Vec<Option<Vec<Option<Metadata>>>>>,
+    pub metadatas: Option<Vec<Option<Metadata>>>,
     pub documents: Option<Vec<Option<String>>>,
     pub embeddings: Option<Vec<Option<Embedding>>>,
 }
@@ -465,13 +465,14 @@ fn validate(
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde_json::{json, Map};
 
     use crate::v1::{
         collection::{CollectionEntries, GetOptions, QueryOptions},
         embeddings::MockEmbeddingProvider,
         ChromaClient,
     };
+    use crate::v1::commons::Metadata;
 
     const TEST_COLLECTION: &str = "21-recipies-for-octopus";
 
@@ -514,9 +515,16 @@ mod tests {
         assert!(collection.count().is_ok());
 
         let ids = vec!["test1".into(), "test2".into(), "test3".into(), "test4".into()];
+        let mut metadata = Metadata::new();
+        metadata.insert("foo".into(), "bar".into());
         let collection_entries = CollectionEntries {
             ids: ids.clone(),
-            metadatas: None,
+            metadatas: Some(vec![
+                metadata.clone(),
+                metadata.clone(),
+                Metadata::new(),
+                Metadata::new()
+            ]),
             documents: Some(vec![
                 "Document content 1".into(),
                 "Document content 2".into(),
@@ -555,6 +563,18 @@ mod tests {
         let get_result = collection.get(get_query).unwrap();
         assert_eq!(get_result.ids.len(), limit);
         assert_eq!(get_result.ids[0], ids[offset]);
+
+        let ids_with_no_metadata = vec!["test3".into(), "test4".into()];
+        let get_query = GetOptions {
+            ids: ids_with_no_metadata.clone(),
+            where_metadata: None,
+            limit: None,
+            offset: None,
+            where_document: None,
+            include: None,
+        };
+        let get_result = collection.get(get_query).unwrap();
+        assert_eq!(get_result.ids.len(), ids_with_no_metadata.len());
 
         client.delete_collection(collection_name.as_str()).unwrap()
     }
