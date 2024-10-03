@@ -11,6 +11,8 @@ use serde::Deserialize;
 use serde_json::json;
 
 const DEFAULT_ENDPOINT: &str = "http://localhost:8000";
+const DEFAULT_TENANT: &str = "default_tenant";
+const DEFAULT_DATABASE: &str = "default_database";
 
 // A client representation for interacting with ChromaDB.
 pub struct ChromaClient {
@@ -57,12 +59,13 @@ impl ChromaClient {
         metadata: Option<Metadata>,
         get_or_create: bool,
     ) -> Result<ChromaCollection> {
+        let (tenant, database) = self.get_tenant_and_database();
         let request_body = json!({
             "name": name,
             "metadata": metadata,
             "get_or_create": get_or_create,
         });
-        let response = self.api.post("/collections", Some(request_body))?;
+        let response = self.api.post(&format!("/collections?tenant={}&database={}", tenant, database), Some(request_body))?;
         let mut collection = response.json::<ChromaCollection>()?;
         collection.api = self.api.clone();
         Ok(collection)
@@ -88,7 +91,8 @@ impl ChromaClient {
 
     /// List all collections
     pub fn list_collections(&self) -> Result<Vec<ChromaCollection>> {
-        let response = self.api.get("/collections")?;
+        let (tenant, database) = self.get_tenant_and_database();
+        let response = self.api.get(&format!("/collections?tenant={}&database={}", tenant, database))?;
         let collections = response.json::<Vec<ChromaCollection>>()?;
         let collections = collections
             .into_iter()
@@ -111,7 +115,8 @@ impl ChromaClient {
     /// * If the collection name is invalid
     /// * If the collection does not exist
     pub fn get_collection(&self, name: &str) -> Result<ChromaCollection> {
-        let response = self.api.get(&format!("/collections/{}", name))?;
+        let (tenant, database) = self.get_tenant_and_database();
+        let response = self.api.get(&format!("/collections/{}?tenant={}&database={}", name, tenant, database))?;
         let mut collection = response.json::<ChromaCollection>()?;
         collection.api = self.api.clone();
         Ok(collection)
@@ -128,7 +133,8 @@ impl ChromaClient {
     /// * If the collection name is invalid
     /// * If the collection does not exist
     pub fn delete_collection(&self, name: &str) -> Result<()> {
-        self.api.delete(&format!("/collections/{}", name))?;
+        let (tenant, database) = self.get_tenant_and_database();
+        self.api.delete(&format!("/collections/{}?tenant={}&database={}", name, tenant, database))?;
         Ok(())
     }
 
@@ -151,6 +157,49 @@ impl ChromaClient {
         let response = self.api.get("/heartbeat")?;
         let json = response.json::<HeartbeatResponse>()?;
         Ok(json.heartbeat)
+    }
+
+    /// Create a new tenant with the given name.
+    pub fn create_tenant(&self, name: &str) -> Result<()> {
+        let request_body = json!({
+            "name": name,
+        });
+        let response = self.api.post("/tenants", Some(request_body))?;
+        let _ = response.as_str()?;
+
+        Ok(())
+    }
+
+    /// Create a new database with the given name.
+    pub fn create_database(&self, name: &str) -> Result<()> {
+        let request_body = json!({
+            "name": name,
+        });
+        let response = self.api.post("/databases", Some(request_body))?;
+        let _ = response.as_str()?;
+
+        Ok(())
+    }
+
+    /// Check if a tenant with the given name exists.
+    pub fn tenant_exists(&self, name: &str) -> bool {
+        let response = self.api.get(&format!("/tenants/{}", name));
+
+        response.is_ok()
+    }
+
+    /// Check if a database with the given name exists.
+    pub fn database_exists(&self, name: &str) -> bool {
+        let response = self.api.get(&format!("/databases/{}", name));
+
+        response.is_ok()
+    }
+
+    fn get_tenant_and_database(&self) -> (String, String) {
+        let tenant = std::env::var("CHROMA_TENANT").unwrap_or(DEFAULT_TENANT.to_string());
+        let database = std::env::var("CHROMA_DATABASE").unwrap_or(DEFAULT_DATABASE.to_string());
+
+        (tenant, database)
     }
 }
 
