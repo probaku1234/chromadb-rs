@@ -2,7 +2,7 @@ use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{collections::HashSet, sync::Arc, vec};
-
+use crate::v1::commons::ConfigruationJson;
 use super::{
     api::APIClientV1,
     commons::{Documents, Embedding, Embeddings, Metadata, Metadatas, Result},
@@ -17,6 +17,7 @@ pub struct ChromaCollection {
     pub(super) id: String,
     pub(super) metadata: Option<Metadata>,
     pub(super) name: String,
+    pub(super) configuration_json: Option<ConfigruationJson>,
 }
 
 impl ChromaCollection {
@@ -34,6 +35,9 @@ impl ChromaCollection {
     pub fn metadata(&self) -> Option<&Metadata> {
         self.metadata.as_ref()
     }
+    
+    /// Get the configuration json of the collection.
+    pub fn configuration_json(&self) -> Option<&ConfigruationJson> { self.configuration_json.as_ref() }
 
     /// The total number of embeddings added to the database.
     pub fn count(&self) -> Result<usize> {
@@ -465,7 +469,8 @@ fn validate(
 
 #[cfg(test)]
 mod tests {
-    use serde_json::{json, Map};
+    use rand::Rng;
+    use serde_json::{json, Map, Value};
 
     use crate::v1::{
         collection::{CollectionEntries, GetOptions, QueryOptions},
@@ -476,6 +481,17 @@ mod tests {
 
     const TEST_COLLECTION: &str = "21-recipies-for-octopus";
 
+    #[test]
+    fn test_get_info_collection() {
+        let client = ChromaClient::new(Default::default());
+
+        let collection = client
+            .get_or_create_collection(TEST_COLLECTION, None)
+            .unwrap();
+
+        assert!(collection.configuration_json().is_some());
+    }
+    
     #[test]
     fn test_modify_collection() {
         let client = ChromaClient::new(Default::default());
