@@ -1,5 +1,5 @@
 use std::sync::Arc;
-
+use anyhow::anyhow;
 pub use super::api::{ChromaAuthMethod, ChromaTokenHeader};
 use super::{
     api::APIClientV1,
@@ -182,17 +182,17 @@ impl ChromaClient {
     }
 
     /// Check if a tenant with the given name exists.
-    pub fn tenant_exists(&self, name: &str) -> bool {
-        let response = self.api.get(&format!("/tenants/{}", name));
-
-        response.is_ok()
+    pub fn tenant_exists(&self, name: &str) -> Result<bool> {
+        let response = self.api.get(&format!("/tenants/{}", name))?;
+        
+        Ok(true)
     }
 
     /// Check if a database with the given name exists.
-    pub fn database_exists(&self, name: &str) -> bool {
-        let response = self.api.get(&format!("/databases/{}", name));
+    pub fn database_exists(&self, name: &str) -> Result<bool> {
+        let response = self.api.get(&format!("/databases/{}", name))?;
 
-        response.is_ok()
+        Ok(true)
     }
 
     fn get_tenant_and_database(&self) -> (String, String) {
